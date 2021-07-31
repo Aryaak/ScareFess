@@ -1,0 +1,17 @@
+{
+  "name": "scarefess",
+  "version": "1.0.0",
+  "description": "Auto Menfess Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Arya Rizky",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^8.6.0",
+    "request": "^2.88.2",
+    "twitter-autohook": "^1.7.2"
+  }
+}
