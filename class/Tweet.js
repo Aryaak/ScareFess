@@ -85,7 +85,6 @@ class Tweet {
 
         await this.checkFriendship(this.Validate.dev_screen_name, this.messageVar.senderScreenName).then(response => {
            this.friendship = JSON.parse(Buffer.from(response.body).toString());
-           console.log("FRIENDSHIP : ", this.friendship);
         })
 
         if(!this.friendship.relationship.target.following){
