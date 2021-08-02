@@ -1,5 +1,6 @@
 const { Validation } =require('./Validation');
 const { OAuth } = require('./OAuth');
+const { Quote } = require('./Quotes');
 const util          = require('util');
 const request       = require('request').defaults({encoding: null});
 
@@ -7,12 +8,15 @@ class Tweet {
     constructor(){
         this.OA =  new OAuth();
         this.Validate =  new Validation();
+        this.Q =  new Quote();
         this.get = util.promisify(request.get);
         this.post = util.promisify(request.post);
         this.tweetId = '';
         this.messageVar  = {};
         this.usersVar    = {};
         this.event = {};
+        this.friendship = {};
+        this.quotes = [];
     }
 
     async  receiveDMEvent(event) {
@@ -43,6 +47,8 @@ class Tweet {
             senderId          : message.message_create.sender_id,
             senderMsgId       : message.id,
         };
+
+       
  
         // Check to see if the message is undefined/error.
         if (typeof message === 'undefined' || typeof message.message_create === 'undefined') {
@@ -56,7 +62,7 @@ class Tweet {
     
         // [CHANGEABLE] Put your own sender id to block the bot from sending DM to itself.
         // Check it in console.log(senderId);
-        if (this.messageVar.senderId === '1267122167306543104') {
+        if (this.messageVar.senderId === '1421363180253577218') {
             return;
         }
     
@@ -66,12 +72,34 @@ class Tweet {
             return;
         }
 
+
         // [CHANGEABLE] Rejects all messages from users below 100 followers and 500 tweets.
         else if (!(this.usersVar.usersFollowersCount > this.Validate.getFollowers() && this.usersVar.usersStatusesCount > this.Validate.getStatuses())) {
+          
             await this.rejectMessage(this.messageVar.senderId, this.messageVar.senderScreenName);
             return;
         }
         else
+
+        this.quotes = this.Q.getQuotes();
+
+        await this.checkFriendship(this.Validate.dev_screen_name, this.messageVar.senderScreenName).then(response => {
+           this.friendship = JSON.parse(Buffer.from(response.body).toString());
+           console.log("FRIENDSHIP : ", this.friendship);
+        })
+
+        if(!this.friendship.relationship.target.following){
+            await  this.tellToFollowMessage(this.messageVar.senderId, this.messageVar.senderScreenName).then(function(response){
+            });
+            return;
+        }
+
+        if(!this.friendship.relationship.source.following){
+            await  this.tellNotFollbackMessage(this.messageVar.senderId, this.messageVar.senderScreenName).then(function(response){
+            });
+            return;
+        }
+
     
         // This if else if functions will check the messages for an image.
         // If there's no image, then it will check for URL/Link.
@@ -116,7 +144,10 @@ class Tweet {
                 var urlToRemove = senderMediaLink;
                 var statusNoUrl = statusWithUrl.replace(urlToRemove, "");
                 
-                const encodeMsg = statusNoUrl;
+                let encodeMsg = statusNoUrl;
+                if (encodeMsg.length <= 150){
+                    encodeMsg += '\n\n\n 👻 Quote: ' + this.quotes[Math.floor(Math.random()*this.quotes.length)].quote; 
+                }
                 const encodeImg = mediaIdString;
 
                 await this.postTweet(this.messageVar.senderScreenName, encodeMsg, undefined, encodeImg);
@@ -131,7 +162,10 @@ class Tweet {
     
             try {
     
-                const encodeMsg = this.messageVar.senderMessage;
+                let encodeMsg = this.messageVar.senderMessage;
+                if (encodeMsg.length <= 150){
+                    encodeMsg += '\n\n\n 👻 Quote: ' + this.quotes[Math.floor(Math.random()*this.quotes.length)].quote; 
+                }
                 const encodeUrl = this.messageVar.senderUrl;
 
                 await this.postTweet(this.messageVar.senderScreenName, encodeMsg, encodeUrl, undefined);
@@ -146,8 +180,10 @@ class Tweet {
     
             try {
     
-                const encodeMsg = this.messageVar.senderMessage;
-
+                let encodeMsg = this.messageVar.senderMessage;
+                if (encodeMsg.length <= 150){
+                    encodeMsg += '\n\n\n 👻 Quote: ' + this.quotes[Math.floor(Math.random()*this.quotes.length)].quote; 
+                }
                 await this.postTweet(this.messageVar.senderScreenName, encodeMsg, undefined, undefined);
             }
             
@@ -155,6 +191,17 @@ class Tweet {
                 console.error(e);
             }
         }
+    }
+
+    async checkFriendship(source_screen_name, target_screen_name){
+        const request = {
+            url: `https://api.twitter.com/1.1/friendships/show.json?source_screen_name=${source_screen_name}&target_screen_name=${target_screen_name}`,
+            oauth: this.OA.getConfig(),
+        };
+        return await this.get(request).then(function(response) {
+            return response;
+        })
+        .catch(error => console.error(error));
     }
     
     async  getTweetId() {
@@ -186,7 +233,7 @@ class Tweet {
     
         // [CHANGEABLE] Put your own sender id to block the bot from sending DM to itself.
         // Check it in console.log(senderId);
-        if (this.messageVar.senderId === '1267122167306543104') {
+        if (this.messageVar.senderId === '1421363180253577218') {
             return;
         }
     
@@ -207,8 +254,6 @@ class Tweet {
     async  replyDMEvent(event) {
         this.event = event;
         this.tweetId = await this.getTweetId();
-        
-        
     
         // Calling function to mark read the message sent to us. 
         await this.markAsRead(this.messageVar.senderMsgId, this.messageVar.senderId).then(response => {
@@ -224,6 +269,34 @@ class Tweet {
     
         await this.replyDirectMessage();
     } 
+
+    async welcomeMessage(event){
+        this.event = event;
+        const sender_id = this.event.follow_events[0].source.id
+        const screen_name = this.event.follow_events[0].source.screen_name
+        const requestReply = {
+            url: 'https://api.twitter.com/1.1/direct_messages/events/new.json',
+            oauth: this.OA.getConfig(),
+            json: {
+            event: {
+                type: 'message_create',
+                message_create: {
+                target: {
+                    recipient_id: sender_id
+                },
+                message_data: {
+                    text: `Hai @${screen_name}! 👋. Selamat datang di Scare Fess ya \n ~👻`
+                }
+                }
+            }
+            }
+        };
+        console.log(`[${new Date().toLocaleString()}] [CONSOLE] User @${screen_name} following`);
+        return await this.post(requestReply).then(function(response) {
+            return response;
+        })
+        .catch(error => console.error(error));
+    }
     
     // And all this functions below is the functions to be called inside the receive/replyDMEvent function.
     async  markAsRead(message_id, sender_id) {
@@ -371,6 +444,59 @@ class Tweet {
         })
         .catch(error => console.error(error));
     }
+
+    async  tellToFollowMessage(sender_id, sender_screen_name) {
+    
+        const requestReject = {
+            url: 'https://api.twitter.com/1.1/direct_messages/events/new.json',
+            oauth: this.OA.getConfig(),
+            json: {
+            event: {
+                type: 'message_create',
+                message_create: {
+                target: {
+                    recipient_id: sender_id
+                },
+                message_data: {
+                    text: `Hai @${sender_screen_name}! 👋. Wah kamu belum follow nih, follow dulu yuk! @scarefess \n ~👻`,
+                }
+                }
+            }
+            }
+        };
+        console.log(`[${new Date().toLocaleString()}] [CONSOLE] Rejected user @${sender_screen_name}'s message`);
+        return await this.post(requestReject).then(function(response) {
+            return response;
+        })
+        .catch(error => console.error(error));
+    }
+
+    async  tellNotFollbackMessage(sender_id, sender_screen_name) {
+    
+        const requestReject = {
+            url: 'https://api.twitter.com/1.1/direct_messages/events/new.json',
+            oauth: this.OA.getConfig(),
+            json: {
+            event: {
+                type: 'message_create',
+                message_create: {
+                target: {
+                    recipient_id: sender_id
+                },
+                message_data: {
+                    text: `Hai @${sender_screen_name}! 👋. Yaaah, kamu belum dapat follback nih, tunggu sesi open follback dulu ya \n ~👻`,
+                }
+                }
+            }
+            }
+        };
+        console.log(`[${new Date().toLocaleString()}] [CONSOLE] Rejected user @${sender_screen_name}'s message`);
+        return await this.post(requestReject).then(function(response) {
+            return response;
+        })
+        .catch(error => console.error(error));
+    }
+    
     
     async postTweet(sender_screen_name, status, attachment_url, media_ids) {
     

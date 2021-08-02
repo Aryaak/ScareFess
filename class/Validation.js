@@ -1,8 +1,13 @@
+const { OAuth } = require('./OAuth');
+
 class Validation {
     constructor(){
-        this.followers = 10,
-        this.statuses = 10,
-        this.trigger = 'scare!'
+        this.OA =  new OAuth();
+        this.followers = 10;
+        this.statuses = 10;
+        this.trigger = 'scare!';
+        this.dev_screen_name = 'scarefess'
+    
     }
 
     getFollowers(){
@@ -16,6 +21,7 @@ class Validation {
     getTrigger(){
         return this.trigger;
     }
+
 
 }
 

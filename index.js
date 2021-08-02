@@ -19,6 +19,9 @@ const T = new Tweet();
         await webhook.start();
 
         webhook.on('event', async event  => {
+            if(event.follow_events){
+                await T.welcomeMessage(event);
+            }
             if (event.direct_message_events) {
                 await T.receiveDMEvent(event);
             }
@@ -36,7 +39,7 @@ const T = new Tweet();
     catch (e) {
         console.error(e);
         if (e.name === 'RateLimitError') {
-            await sleep(e.resetAt - new Date().getTime());
+            await T.sleep(e.resetAt - new Date().getTime());
             process.exit(1);
         }
 
